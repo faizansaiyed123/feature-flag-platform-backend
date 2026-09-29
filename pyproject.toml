@@ -1,0 +1,40 @@
+[project]
+name = "feature-flag-platform-backend"
+version = "0.1.0"
+description = "FastAPI backend for a production-oriented feature flag platform"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "alembic>=1.20,<2",
+  "email-validator>=2.2,<3",
+  "fastapi>=0.120,<1",
+  "httpx>=0.28,<1",
+  "psycopg[binary]>=3.2,<4",
+  "pydantic-settings>=2.10,<3",
+  "PyJWT>=2.10,<3",
+  "pwdlib[argon2]>=0.2,<1",
+  "sqlalchemy[asyncio]>=2.0.43,<3",
+  "uvicorn[standard]>=0.35,<1",
+]
+
+[dependency-groups]
+dev = [
+  "mypy>=1.17,<2",
+  "pytest>=8.3,<10",
+  "pytest-asyncio>=1,<2",
+  "ruff>=0.13,<1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
