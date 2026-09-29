@@ -1,5 +1,7 @@
 from functools import lru_cache
+from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,10 +11,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     api_prefix: str = "/api/v1"
     database_url: str = "postgresql+psycopg://feature_flags:feature_flags@localhost:5432/feature_flags"
-    auth_secret_key: str
+    auth_secret_key: str = Field(min_length=32)
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
     cors_origins: str = "http://localhost:3000"
+    auth_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
