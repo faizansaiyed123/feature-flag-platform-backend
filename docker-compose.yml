@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: feature_flags
+      POSTGRES_PASSWORD: feature_flags
+      POSTGRES_DB: feature_flags
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U feature_flags -d feature_flags"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_ENV: \${APP_ENV:-development}
+      API_PREFIX: \${API_PREFIX:-/api/v1}
+      DATABASE_URL: postgresql+psycopg://feature_flags:feature_flags@db:5432/feature_flags
+      AUTH_SECRET_KEY: \${AUTH_SECRET_KEY:-local-docker-feature-flag-secret-key-32chars-min}
+      CORS_ORIGINS: \${CORS_ORIGINS:-http://localhost:3000}
+    ports:
+      - "\${BACKEND_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:8000' + os.getenv('API_PREFIX', '/api/v1') + '/health').read()"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  postgres_data:
