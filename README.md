@@ -47,7 +47,7 @@ Readiness: `GET /api/v1/ready`
 
 ## Authentication and security
 
-Authentication uses Argon2 password hashing, signed short-lived access cookies, rotating server-side refresh sessions, explicit CORS origins, browser-origin validation for cookie mutations, security headers, request-size protection, and optional trusted-host validation.
+Authentication uses Argon2 password hashing, signed short-lived access cookies, rotating server-side refresh sessions, explicit CORS origins, browser-origin validation for browser mutations, security headers, request-size protection, and bounded authentication rate limits.
 
 Never reuse development secrets in production.
 
@@ -85,6 +85,11 @@ Required production variables:
 | `DB_MAX_OVERFLOW` | Maximum extra connections. |
 | `DB_POOL_TIMEOUT` | Pool wait timeout. |
 | `DB_POOL_RECYCLE` | Connection recycle interval. |
+| `TRUST_PROXY_HEADERS` | Set true only when a trusted reverse proxy strips and sets `X-Forwarded-For`. |
+| `AUTH_LOGIN_RATE_LIMIT` | Login requests per client per rate-limit window. |
+| `AUTH_SIGNUP_RATE_LIMIT` | Signup requests per client per rate-limit window. |
+| `AUTH_REFRESH_RATE_LIMIT` | Refresh requests per client per rate-limit window. |
+| `AUTH_RATE_LIMIT_WINDOW_SECONDS` | Authentication rate-limit window length. |
 
 The frontend public API URL belongs in the frontend repository as `NEXT_PUBLIC_API_BASE_URL`.
 

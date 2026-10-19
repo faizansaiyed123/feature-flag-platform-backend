@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     db_max_overflow: int = Field(default=20, ge=0, le=100)
     db_pool_timeout: int = Field(default=30, ge=1, le=120)
     db_pool_recycle: int = Field(default=1800, ge=60, le=86_400)
+    trust_proxy_headers: bool = False
+    auth_login_rate_limit: int = Field(default=10, ge=1, le=100)
+    auth_signup_rate_limit: int = Field(default=5, ge=1, le=100)
+    auth_refresh_rate_limit: int = Field(default=30, ge=1, le=200)
+    auth_rate_limit_window_seconds: int = Field(default=60, ge=10, le=600)
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

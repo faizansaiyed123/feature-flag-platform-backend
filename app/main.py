@@ -11,6 +11,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.api.v1.router import api_router
 from app.config import get_settings
 from app.db import get_engine
+from app.security.rate_limit import auth_rate_limiter
 
 settings = get_settings()
 
@@ -30,9 +31,32 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                 if too_large:
                     return JSONResponse({"detail": "Request body is too large"}, status_code=413)
             origin = request.headers.get("origin")
-            cookie = request.headers.get("cookie", "")
-            if ("access_token=" in cookie or "refresh_token=" in cookie) and origin and origin not in settings.cors_origin_list:
+            if origin and origin not in settings.cors_origin_list:
                 return JSONResponse({"detail": "Request origin is not allowed"}, status_code=403)
+
+            rate_limits = {
+                f"{settings.api_prefix}/auth/login": settings.auth_login_rate_limit,
+                f"{settings.api_prefix}/auth/signup": settings.auth_signup_rate_limit,
+                f"{settings.api_prefix}/auth/refresh": settings.auth_refresh_rate_limit,
+            }
+            limit = rate_limits.get(request.url.path) if request.method == "POST" else None
+            if limit is not None:
+                client_host = request.client.host if request.client else "unknown"
+                if settings.trust_proxy_headers:
+                    forwarded = request.headers.get("x-forwarded-for", "")
+                    if forwarded:
+                        client_host = forwarded.split(",", 1)[0].strip() or client_host
+                allowed, retry_after = auth_rate_limiter.check(
+                    f"{request.url.path}:{client_host}",
+                    limit,
+                    settings.auth_rate_limit_window_seconds,
+                )
+                if not allowed:
+                    return JSONResponse(
+                        {"detail": "Too many authentication requests. Try again later."},
+                        status_code=429,
+                        headers={"Retry-After": str(retry_after)},
+                    )
 
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"

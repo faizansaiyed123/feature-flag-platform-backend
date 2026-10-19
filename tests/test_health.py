@@ -39,3 +39,15 @@ def test_security_middleware_rejects_untrusted_cookie_origin() -> None:
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Request origin is not allowed"
+
+
+def test_security_middleware_rejects_untrusted_origin_without_auth_cookie() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/auth/login",
+            headers={"Origin": "https://evil.example"},
+            json={"email": "nobody@example.com", "password": "not-a-real-password"},
+        )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Request origin is not allowed"
