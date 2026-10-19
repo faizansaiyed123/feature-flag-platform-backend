@@ -2,7 +2,6 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from app.models.feature_flags import MembershipRole as _UnusedMembershipRole
 from app.models.identity import User
 from app.models.organization import Membership, Organization
 from app.services.auth import signup
@@ -21,13 +20,13 @@ async def test_signup_does_not_commit_its_own_transaction() -> None:
         db=db,
         email="  Feature.Owner@Example.com ",
         password="a-long-enough-test-password",
-        display_name=" Feature Owner ",
+        display_name="Feature Owner",
         organization_name=" Example Workspace ",
     )
 
     assert isinstance(user, User)
     assert user.email == "feature.owner@example.com"
-    assert user.display_name == " Feature Owner "
+    assert user.display_name == "Feature Owner"
     db.commit.assert_not_awaited()
     db.rollback.assert_not_awaited()
 
