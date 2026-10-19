@@ -38,3 +38,7 @@ asyncio_mode = "auto"
 [tool.mypy]
 python_version = "3.13"
 strict = true
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["migrations*", "tests*"]
