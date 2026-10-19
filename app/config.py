@@ -43,6 +43,19 @@ class Settings(BaseSettings):
                 raise ValueError("CORS_ORIGINS must contain at least one origin in production")
             if not self.allowed_host_list:
                 raise ValueError("ALLOWED_HOSTS must contain at least one host in production")
+
+            secret = self.auth_secret_key.strip().lower()
+            if any(marker in secret for marker in ("replace-with", "change-me", "changeme", "example-secret")):
+                raise ValueError("AUTH_SECRET_KEY must be replaced with a unique production secret")
+
+            if "*" in self.cors_origin_list:
+                raise ValueError("CORS_ORIGINS must list exact origins; wildcards are not allowed in production")
+            if "*" in self.allowed_host_list:
+                raise ValueError("ALLOWED_HOSTS must list exact hostnames; wildcards are not allowed in production")
+
+            for origin in self.cors_origin_list:
+                if not origin.startswith("https://") or origin.endswith("/"):
+                    raise ValueError("Production CORS_ORIGINS entries must be exact HTTPS origins without a trailing slash")
         return self
 
 @lru_cache

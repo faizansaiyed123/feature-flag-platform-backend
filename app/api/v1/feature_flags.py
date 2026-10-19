@@ -95,10 +95,27 @@ async def get_flag(flag_id: UUID, user: User = Depends(get_current_user), db: As
 
 @router.patch("/flags/{flag_id}", response_model=FeatureFlagResponse)
 async def update_flag(flag_id: UUID, payload: FeatureFlagUpdate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db_session)) -> FeatureFlag:
-    flag, project, membership = await _flag_access(flag_id, user, db); ensure_role(membership, WRITE_ROLES)
-    for field, value in payload.model_dump(exclude_unset=True).items(): setattr(flag, field, value)
-    await record_audit(db=db, organization_id=project.organization_id, project_id=project.id, action="flag.updated", entity_type="feature_flag", entity_id=flag.id, actor_user_id=user.id, details=payload.model_dump(exclude_unset=True))
-    await db.commit(); return flag
+    flag, project, membership = await _flag_access(flag_id, user, db)
+    ensure_role(membership, WRITE_ROLES)
+    changes = payload.model_dump(exclude_unset=True)
+    # Archiving/unarchiving changes runtime availability and is restricted to
+    # administrators, matching the DELETE (archive) endpoint's policy.
+    if "is_archived" in changes:
+        ensure_role(membership, ADMIN_ROLES)
+    for field, value in changes.items():
+        setattr(flag, field, value)
+    await record_audit(
+        db=db,
+        organization_id=project.organization_id,
+        project_id=project.id,
+        action="flag.updated",
+        entity_type="feature_flag",
+        entity_id=flag.id,
+        actor_user_id=user.id,
+        details=changes,
+    )
+    await db.commit()
+    return flag
 
 @router.delete("/flags/{flag_id}", status_code=204)
 async def archive_flag(flag_id: UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db_session)) -> None:
@@ -171,9 +188,26 @@ async def update_rule(rule_id: UUID, payload: TargetingRuleUpdate, user: User = 
         except ValueError as exc: raise HTTPException(422, str(exc)) from exc
     if data.get("segment_keys") is not None: await _validate_segments(project.id, data["segment_keys"], db)
     if data.get("conditions") is not None: data["conditions"] = [Condition.model_validate(c).model_dump(mode="json") for c in data["conditions"]]
-    for field, value in data.items(): setattr(rule, field, value)
+    for field, value in data.items():
+        setattr(rule, field, value)
     state.version += 1
-    await record_audit(db=db, organization_id=project.organization_id, project_id=project.id, action="targeting_rule.updated", entity_type="targeting_rule", entity_id=rule.id, actor_user_id=user.id); await db.commit(); await db.refresh(rule); return rule
+    await record_audit(
+        db=db,
+        organization_id=project.organization_id,
+        project_id=project.id,
+        action="targeting_rule.updated",
+        entity_type="targeting_rule",
+        entity_id=rule.id,
+        actor_user_id=user.id,
+        details={"changed_fields": sorted(data.keys())},
+    )
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(409, "Rule priority already exists") from exc
+    await db.refresh(rule)
+    return rule
 
 @router.delete("/rules/{rule_id}", status_code=204)
 async def delete_rule(rule_id: UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db_session)) -> None:

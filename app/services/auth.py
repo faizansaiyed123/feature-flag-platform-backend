@@ -22,16 +22,22 @@ def slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return slug[:70] or f"workspace-{uuid4().hex[:8]}"
 
+def _refresh_cookie_path() -> str:
+    prefix = get_settings().api_prefix.rstrip("/")
+    return f"{prefix}/auth" if prefix else "/auth"
+
+
 def set_auth_cookies(response: Response, tokens: AuthTokens) -> None:
     settings = get_settings()
     secure = settings.app_env.lower() == "production"
     samesite = settings.auth_cookie_samesite
     response.set_cookie("access_token", tokens.access_token, httponly=True, secure=secure, samesite=samesite, max_age=60 * settings.access_token_expire_minutes, path="/")
-    response.set_cookie("refresh_token", tokens.refresh_token, httponly=True, secure=secure, samesite=samesite, max_age=60 * 60 * 24 * settings.refresh_token_expire_days, path="/api/v1/auth")
+    response.set_cookie("refresh_token", tokens.refresh_token, httponly=True, secure=secure, samesite=samesite, max_age=60 * 60 * 24 * settings.refresh_token_expire_days, path=_refresh_cookie_path())
+
 
 def clear_auth_cookies(response: Response) -> None:
     response.delete_cookie("access_token", path="/")
-    response.delete_cookie("refresh_token", path="/api/v1/auth")
+    response.delete_cookie("refresh_token", path=_refresh_cookie_path())
 
 async def create_auth_session(db: AsyncSession, user_id: UUID) -> AuthTokens:
     settings = get_settings()
@@ -80,25 +86,31 @@ async def signup(*, db: AsyncSession, email: str, password: str, display_name: s
     existing = await db.scalar(select(User).where(User.email == normalized_email))
     if existing:
         raise ValueError("Email is already registered")
+
     user = User(email=normalized_email, password_hash=hash_password(password), display_name=display_name)
-    db.add(user)
-    await db.flush()
-    base_slug = slugify(organization_name)
-    slug = base_slug
-    for _ in range(5):
-        if not await db.scalar(select(Organization.id).where(Organization.slug == slug)):
-            break
-        slug = f"{base_slug[:60]}-{uuid4().hex[:6]}"
-    organization = Organization(name=organization_name, slug=slug)
-    db.add(organization)
-    await db.flush()
-    db.add(Membership(organization_id=organization.id, user_id=user.id, role=MembershipRole.OWNER))
     try:
-        await db.commit()
+        db.add(user)
+        await db.flush()
+
+        base_slug = slugify(organization_name)
+        slug = base_slug
+        for _ in range(5):
+            if not await db.scalar(select(Organization.id).where(Organization.slug == slug)):
+                break
+            slug = f"{base_slug[:60]}-{uuid4().hex[:6]}"
+
+        organization = Organization(name=organization_name, slug=slug)
+        db.add(organization)
+        await db.flush()
+        db.add(Membership(organization_id=organization.id, user_id=user.id, role=MembershipRole.OWNER))
     except IntegrityError as exc:
         await db.rollback()
-        raise ValueError("Account could not be created because the submitted data conflicts with an existing account") from exc
-    await db.refresh(user)
+        raise ValueError(
+            "Account could not be created because the submitted data conflicts with an existing account or workspace"
+        ) from exc
+
+    # The caller owns the transaction so account, organization, membership, and
+    # authentication session are committed or rolled back together.
     return user
 
 async def login(*, db: AsyncSession, email: str, password: str) -> User | None:
