@@ -22,16 +22,22 @@ def slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return slug[:70] or f"workspace-{uuid4().hex[:8]}"
 
+def _refresh_cookie_path() -> str:
+    prefix = get_settings().api_prefix.rstrip("/")
+    return f"{prefix}/auth" if prefix else "/auth"
+
+
 def set_auth_cookies(response: Response, tokens: AuthTokens) -> None:
     settings = get_settings()
     secure = settings.app_env.lower() == "production"
     samesite = settings.auth_cookie_samesite
     response.set_cookie("access_token", tokens.access_token, httponly=True, secure=secure, samesite=samesite, max_age=60 * settings.access_token_expire_minutes, path="/")
-    response.set_cookie("refresh_token", tokens.refresh_token, httponly=True, secure=secure, samesite=samesite, max_age=60 * 60 * 24 * settings.refresh_token_expire_days, path="/api/v1/auth")
+    response.set_cookie("refresh_token", tokens.refresh_token, httponly=True, secure=secure, samesite=samesite, max_age=60 * 60 * 24 * settings.refresh_token_expire_days, path=_refresh_cookie_path())
+
 
 def clear_auth_cookies(response: Response) -> None:
     response.delete_cookie("access_token", path="/")
-    response.delete_cookie("refresh_token", path="/api/v1/auth")
+    response.delete_cookie("refresh_token", path=_refresh_cookie_path())
 
 async def create_auth_session(db: AsyncSession, user_id: UUID) -> AuthTokens:
     settings = get_settings()
