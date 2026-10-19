@@ -80,25 +80,31 @@ async def signup(*, db: AsyncSession, email: str, password: str, display_name: s
     existing = await db.scalar(select(User).where(User.email == normalized_email))
     if existing:
         raise ValueError("Email is already registered")
+
     user = User(email=normalized_email, password_hash=hash_password(password), display_name=display_name)
-    db.add(user)
-    await db.flush()
-    base_slug = slugify(organization_name)
-    slug = base_slug
-    for _ in range(5):
-        if not await db.scalar(select(Organization.id).where(Organization.slug == slug)):
-            break
-        slug = f"{base_slug[:60]}-{uuid4().hex[:6]}"
-    organization = Organization(name=organization_name, slug=slug)
-    db.add(organization)
-    await db.flush()
-    db.add(Membership(organization_id=organization.id, user_id=user.id, role=MembershipRole.OWNER))
     try:
-        await db.commit()
+        db.add(user)
+        await db.flush()
+
+        base_slug = slugify(organization_name)
+        slug = base_slug
+        for _ in range(5):
+            if not await db.scalar(select(Organization.id).where(Organization.slug == slug)):
+                break
+            slug = f"{base_slug[:60]}-{uuid4().hex[:6]}"
+
+        organization = Organization(name=organization_name, slug=slug)
+        db.add(organization)
+        await db.flush()
+        db.add(Membership(organization_id=organization.id, user_id=user.id, role=MembershipRole.OWNER))
     except IntegrityError as exc:
         await db.rollback()
-        raise ValueError("Account could not be created because the submitted data conflicts with an existing account") from exc
-    await db.refresh(user)
+        raise ValueError(
+            "Account could not be created because the submitted data conflicts with an existing account or workspace"
+        ) from exc
+
+    # The caller owns the transaction so account, organization, membership, and
+    # authentication session are committed or rolled back together.
     return user
 
 async def login(*, db: AsyncSession, email: str, password: str) -> User | None:
