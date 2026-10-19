@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import ADMIN_ROLES, WRITE_ROLES, ensure_role, get_current_user, get_membership, require_project_access
+from app.api.deps import ADMIN_ROLES, WRITE_ROLES, ensure_environment_write_access, ensure_role, get_current_user, get_membership, require_project_access
 from app.db import get_db_session
 from app.models.feature_flags import EnvironmentKey, FeatureFlag, FlagEnvironmentState, Segment, TargetingRule
 from app.models.identity import User
@@ -111,6 +111,7 @@ async def update_environment_state(flag_id: UUID, environment_id: UUID, payload:
     flag, project, membership = await _flag_access(flag_id, user, db); ensure_role(membership, WRITE_ROLES)
     env = await db.scalar(select(Environment).where(Environment.id == environment_id, Environment.project_id == project.id))
     if not env: raise HTTPException(404, "Environment not found")
+    ensure_environment_write_access(env, membership)
     try: _validate_value(flag.flag_type.value, payload.default_value)
     except ValueError as exc: raise HTTPException(422, str(exc)) from exc
     state = await db.scalar(select(FlagEnvironmentState).options(selectinload(FlagEnvironmentState.targeting_rules)).where(FlagEnvironmentState.flag_id == flag.id, FlagEnvironmentState.environment_id == env.id))
@@ -135,6 +136,7 @@ async def create_rule(flag_id: UUID, environment_id: UUID, payload: TargetingRul
     flag, project, membership = await _flag_access(flag_id, user, db); ensure_role(membership, WRITE_ROLES)
     env = await db.scalar(select(Environment).where(Environment.id == environment_id, Environment.project_id == project.id))
     if not env: raise HTTPException(404, "Environment not found")
+    ensure_environment_write_access(env, membership)
     try: _validate_value(flag.flag_type.value, payload.serve_value)
     except ValueError as exc: raise HTTPException(422, str(exc)) from exc
     await _validate_segments(project.id, payload.segment_keys, db)
@@ -159,9 +161,10 @@ async def update_rule(rule_id: UUID, payload: TargetingRuleUpdate, user: User = 
     state = await db.scalar(select(FlagEnvironmentState).where(FlagEnvironmentState.id == rule.flag_environment_state_id))
     flag = await db.scalar(select(FeatureFlag).where(FeatureFlag.id == state.flag_id)) if state else None
     project = await db.scalar(select(Project).where(Project.id == flag.project_id)) if flag else None
+    env = await db.scalar(select(Environment).where(Environment.id == state.environment_id)) if state else None
     membership = await get_membership(project.organization_id, user, db) if project else None
-    if not rule or not state or not flag or not project or not membership: raise HTTPException(404, "Targeting rule not found")
-    ensure_role(membership, WRITE_ROLES)
+    if not rule or not state or not flag or not project or not env or not membership: raise HTTPException(404, "Targeting rule not found")
+    ensure_environment_write_access(env, membership)
     data = payload.model_dump(exclude_unset=True)
     if data.get("serve_value") is not None:
         try: _validate_value(flag.flag_type.value, data["serve_value"])
@@ -179,9 +182,10 @@ async def delete_rule(rule_id: UUID, user: User = Depends(get_current_user), db:
     state = await db.scalar(select(FlagEnvironmentState).where(FlagEnvironmentState.id == rule.flag_environment_state_id))
     flag = await db.scalar(select(FeatureFlag).where(FeatureFlag.id == state.flag_id)) if state else None
     project = await db.scalar(select(Project).where(Project.id == flag.project_id)) if flag else None
+    env = await db.scalar(select(Environment).where(Environment.id == state.environment_id)) if state else None
     membership = await get_membership(project.organization_id, user, db) if project else None
-    if not state or not project or not membership: raise HTTPException(404, "Targeting rule not found")
-    ensure_role(membership, WRITE_ROLES); state.version += 1; await db.delete(rule)
+    if not state or not project or not env or not membership: raise HTTPException(404, "Targeting rule not found")
+    ensure_environment_write_access(env, membership); state.version += 1; await db.delete(rule)
     await record_audit(db=db, organization_id=project.organization_id, project_id=project.id, action="targeting_rule.deleted", entity_type="targeting_rule", entity_id=rule.id, actor_user_id=user.id); await db.commit()
 
 @router.get("/projects/{project_id}/segments", response_model=list[SegmentResponse])

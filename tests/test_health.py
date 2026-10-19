@@ -28,3 +28,14 @@ def test_cors_allows_feature_evaluation_header() -> None:
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
     assert "X-Feature-Key" in response.headers["access-control-allow-headers"]
+
+
+def test_security_middleware_rejects_untrusted_cookie_origin() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/auth/logout",
+            headers={"Origin": "https://evil.example", "Cookie": "access_token=fake"},
+        )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Request origin is not allowed"

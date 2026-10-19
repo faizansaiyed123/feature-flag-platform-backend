@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import ADMIN_ROLES, WRITE_ROLES, ensure_role, get_current_user, get_membership, require_project_access
+from app.api.deps import ADMIN_ROLES, WRITE_ROLES, ensure_environment_write_access, ensure_role, get_current_user, get_membership, require_project_access
 from app.db import get_db_session
 from app.models.feature_flags import EnvironmentKey
 from app.models.identity import User
@@ -77,7 +77,7 @@ async def list_environments(access: tuple[Project, Membership] = Depends(require
 @router.post("/projects/{project_id}/environments", response_model=EnvironmentCreatedResponse, status_code=status.HTTP_201_CREATED)
 async def create_environment(payload: EnvironmentCreate, access: tuple[Project, Membership] = Depends(require_project_access), db: AsyncSession = Depends(get_db_session)) -> EnvironmentCreatedResponse:
     project, membership = access
-    ensure_role(membership, WRITE_ROLES)
+    ensure_role(membership, ADMIN_ROLES if payload.is_protected else WRITE_ROLES)
     environment = Environment(project_id=project.id, name=payload.name, key=payload.key, is_protected=payload.is_protected)
     db.add(environment)
     try:
@@ -113,7 +113,10 @@ async def update_environment(environment_id: UUID, payload: EnvironmentUpdate, u
     membership = await get_membership(project.organization_id, user, db)
     if not membership:
         raise HTTPException(status_code=404, detail="Environment not found")
-    ensure_role(membership, WRITE_ROLES)
+    if payload.is_protected is not None:
+        ensure_role(membership, ADMIN_ROLES)
+    else:
+        ensure_role(membership, WRITE_ROLES)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(environment, field, value)
     await record_audit(db=db, organization_id=project.organization_id, project_id=project.id, action="environment.updated", entity_type="environment", entity_id=environment.id, actor_user_id=user.id, details=payload.model_dump(exclude_unset=True))

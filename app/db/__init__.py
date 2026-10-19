@@ -1,14 +1,13 @@
 from collections.abc import AsyncGenerator
 from functools import lru_cache
-
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
-
 from app.config import get_settings
 from app.db.base import Base
 
 @lru_cache
 def get_engine() -> AsyncEngine:
-    return create_async_engine(get_settings().database_url, pool_pre_ping=True)
+    settings = get_settings()
+    return create_async_engine(settings.database_url, pool_pre_ping=True, pool_size=settings.db_pool_size, max_overflow=settings.db_max_overflow, pool_timeout=settings.db_pool_timeout, pool_recycle=settings.db_pool_recycle)
 
 @lru_cache
 def get_session_maker() -> async_sessionmaker[AsyncSession]:

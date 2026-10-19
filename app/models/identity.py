@@ -8,6 +8,8 @@ from app.models._mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
     from app.models.organization import Membership
+    from app.models.refresh_session import RefreshSession
+
 
 class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "users"
@@ -18,5 +20,8 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 
     memberships: Mapped[list["Membership"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    refresh_sessions: Mapped[list["RefreshSession"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )

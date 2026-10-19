@@ -1,6 +1,6 @@
 # Feature Flag Platform — Backend
 
-FastAPI backend for the Feature Flag Platform backed by PostgreSQL.
+Production-oriented FastAPI backend for the Feature Flag Platform.
 
 ## Stack
 
@@ -12,128 +12,99 @@ FastAPI backend for the Feature Flag Platform backed by PostgreSQL.
 - Alembic
 - PostgreSQL
 
-Redis, Celery, RabbitMQ, background workers, queues, and schedulers are not used by this repository.
+The backend does not require Redis, Celery, RabbitMQ, or a worker process.
 
-## Prerequisites
+## Local development
 
-For the automated backend startup and Docker workflow, install Docker with the Docker Compose plugin and Python 3.13+ for `run.py`.
+Create a local environment file:
 
-For native development without Docker, provide a PostgreSQL instance.
+```bash
+cp .env.example .env
+```
 
-## Automated backend startup
+Generate a development secret:
 
-This repository owns the local backend startup script. It starts the backend stack only; it does not start the separate frontend repository.
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
 
-From this repository:
+Put the generated value in `AUTH_SECRET_KEY`.
+
+Start the backend and local PostgreSQL:
 
 ```bash
 python run.py
 ```
 
-The script runs the existing Docker Compose stack, which starts PostgreSQL, waits for PostgreSQL readiness, runs the existing Alembic migrations, and starts the FastAPI API.
-
-The frontend remains independent and can be started separately from its own repository.
-
-## Docker startup
-
-Start the backend and its PostgreSQL service independently:
+Or:
 
 ```bash
 docker compose up --build
 ```
 
-The API is available at `http://localhost:8000` by default.
+Liveness: `GET /api/v1/health`  
+Readiness: `GET /api/v1/ready`
 
-The backend container installs the dependencies declared in `pyproject.toml`, runs `alembic upgrade head`, and then starts the existing FastAPI application with Uvicorn.
+## Authentication and security
 
-PostgreSQL is exposed to the backend container through the Compose service network. The Docker database uses:
+Authentication uses Argon2 password hashing, signed short-lived access cookies, rotating server-side refresh sessions, explicit CORS origins, browser-origin validation for cookie mutations, security headers, request-size protection, and optional trusted-host validation.
 
-- database: `feature_flags`
-- user: `feature_flags`
-- password: `feature_flags`
-- container host: `db`
-- port: `5432`
+Never reuse development secrets in production.
 
-The host API port can be changed with `BACKEND_PORT` without changing the application port inside the container.
+## Production deployment
 
-## API port
-
-Default host/API port:
-
-```text
-8000
-```
-
-The application itself listens on container port `8000`.
-
-## Environment variables
-
-The application loads `.env` using `pydantic-settings`. The supported settings are:
-
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `APP_NAME` | No | API application name. |
-| `APP_ENV` | No | Environment name; defaults to `development`. |
-| `LOG_LEVEL` | No | Logging level; defaults to `INFO`. |
-| `API_PREFIX` | No | API prefix; defaults to `/api/v1`. |
-| `DATABASE_URL` | Yes for native setup | PostgreSQL SQLAlchemy URL. |
-| `AUTH_SECRET_KEY` | Yes | Secret used to sign access and refresh tokens; use at least 32 characters. |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Access-token lifetime. |
-| `REFRESH_TOKEN_EXPIRE_DAYS` | No | Refresh-token lifetime. |
-| `CORS_ORIGINS` | No | Comma-separated browser origins; defaults to `http://localhost:3000`. |
-| `AUTH_COOKIE_SAMESITE` | No | Cookie SameSite policy: `lax`, `strict`, or `none`. |
-
-For Docker Compose, `DATABASE_URL` is set to the internal PostgreSQL service automatically. `AUTH_SECRET_KEY` and `CORS_ORIGINS` have local-development defaults and can be overridden with environment variables. Never commit real secrets.
-
-## Database and migrations
-
-PostgreSQL is required by the application. The repository contains Alembic migrations under `migrations/`.
-
-With Docker Compose, PostgreSQL becomes healthy before the API starts, and the API container runs:
+The application image does **not** run migrations during container startup. Apply migrations as a release step:
 
 ```bash
 alembic upgrade head
 ```
 
-before starting Uvicorn.
+Then start the API:
 
-For native development, start PostgreSQL separately, set `DATABASE_URL` in `.env`, and run:
+```bash
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+For Docker with a managed/external PostgreSQL database:
+
+```bash
+docker compose -f docker-compose.production.yml up --build -d
+```
+
+Required production variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `APP_ENV=production` | Enables secure production behavior. |
+| `DATABASE_URL` | PostgreSQL connection string. |
+| `AUTH_SECRET_KEY` | JWT signing secret. |
+| `CORS_ORIGINS` | Exact frontend origins. |
+| `ALLOWED_HOSTS` | Exact public API hosts. |
+| `AUTH_COOKIE_SAMESITE` | Prefer `lax` for same-site deployments. |
+| `DB_POOL_SIZE` | SQLAlchemy pool size. |
+| `DB_MAX_OVERFLOW` | Maximum extra connections. |
+| `DB_POOL_TIMEOUT` | Pool wait timeout. |
+| `DB_POOL_RECYCLE` | Connection recycle interval. |
+
+The frontend public API URL belongs in the frontend repository as `NEXT_PUBLIC_API_BASE_URL`.
+
+## Database operations
 
 ```bash
 alembic upgrade head
-python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+alembic current
+alembic heads
 ```
 
-## Health check
+Production PostgreSQL must use managed backups and a tested restore procedure. A Docker volume is not a backup.
 
-The liveness endpoint is:
-
-```text
-GET /api/v1/health
-```
-
-By default it is available at `http://localhost:8000/api/v1/health`.
-
-## Stop
-
-For Docker Compose:
+## Verification
 
 ```bash
-docker compose down
+pytest
+python -m compileall app tests
+alembic heads
+ruff check .
 ```
 
-For `python run.py`, press `Ctrl+C`.
-
-The PostgreSQL named volume is retained by `docker compose down`, so database data survives normal container teardown.
-
-## Rebuild
-
-```bash
-docker compose up --build
-```
-
-## Manual setup
-
-Native development still requires a running PostgreSQL instance and a configured `DATABASE_URL`.
-
-No Redis or other supporting service is required.
+For production release, also run the frontend build and full staging E2E/authorization tests.

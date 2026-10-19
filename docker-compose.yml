@@ -2,13 +2,13 @@ services:
   db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: feature_flags
-      POSTGRES_PASSWORD: feature_flags
-      POSTGRES_DB: feature_flags
+      POSTGRES_USER: ${POSTGRES_USER:-feature_flags}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-feature_flags}
+      POSTGRES_DB: ${POSTGRES_DB:-feature_flags}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U feature_flags -d feature_flags"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-feature_flags} -d ${POSTGRES_DB:-feature_flags}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -22,13 +22,15 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       API_PREFIX: ${API_PREFIX:-/api/v1}
-      DATABASE_URL: postgresql+psycopg://feature_flags:feature_flags@db:5432/feature_flags
-      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-local-docker-feature-flag-secret-key-32chars-min}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-feature_flags}:${POSTGRES_PASSWORD:-feature_flags}@db:5432/${POSTGRES_DB:-feature_flags}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:?AUTH_SECRET_KEY must be set}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      AUTH_COOKIE_SAMESITE: ${AUTH_COOKIE_SAMESITE:-lax}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:8000' + os.getenv('API_PREFIX', '/api/v1') + '/health').read()"]
+      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:8000' + os.getenv('API_PREFIX', '/api/v1') + '/ready').read()"]
       interval: 5s
       timeout: 5s
       retries: 12

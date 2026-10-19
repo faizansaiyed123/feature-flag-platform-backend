@@ -9,10 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db_session
 from app.models.identity import User
 from app.models.organization import Membership, MembershipRole
-from app.models.project import Project
+from app.models.project import Environment, Project
 from app.security.tokens import decode_token
 
 bearer_scheme = HTTPBearer(auto_error=False)
+
 
 async def get_current_user(
     request: Request,
@@ -34,8 +35,15 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is inactive or missing")
     return user
 
+
 async def get_membership(organization_id: UUID, user: User, db: AsyncSession) -> Membership | None:
-    return await db.scalar(select(Membership).where(Membership.organization_id == organization_id, Membership.user_id == user.id))
+    return await db.scalar(
+        select(Membership).where(
+            Membership.organization_id == organization_id,
+            Membership.user_id == user.id,
+        )
+    )
+
 
 async def require_org_membership(
     organization_id: UUID,
@@ -47,9 +55,11 @@ async def require_org_membership(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
     return membership
 
+
 def ensure_role(membership: Membership, allowed: Sequence[MembershipRole]) -> None:
     if membership.role not in allowed:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient organization role")
+
 
 async def require_project_access(
     project_id: UUID,
@@ -63,6 +73,14 @@ async def require_project_access(
     if not membership:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     return project, membership
+
+
+def ensure_environment_write_access(environment: Environment, membership: Membership) -> None:
+    if environment.is_protected:
+        ensure_role(membership, ADMIN_ROLES)
+    else:
+        ensure_role(membership, WRITE_ROLES)
+
 
 WRITE_ROLES = (MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MEMBER)
 ADMIN_ROLES = (MembershipRole.OWNER, MembershipRole.ADMIN)

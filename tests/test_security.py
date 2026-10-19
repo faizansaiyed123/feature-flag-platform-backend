@@ -4,7 +4,8 @@ os.environ.setdefault("AUTH_SECRET_KEY", "test-only-secret-32-bytes-long-minimum
 from datetime import timedelta
 
 from app.security.passwords import hash_password, verify_password
-from app.security.tokens import create_token, decode_token
+from app.security.tokens import create_token, decode_token, decode_token_claims
+
 
 def test_password_hash_is_not_plaintext_and_verifies() -> None:
     password = "correct horse battery staple"
@@ -13,7 +14,20 @@ def test_password_hash_is_not_plaintext_and_verifies() -> None:
     assert verify_password(password, password_hash)
     assert not verify_password("wrong password", password_hash)
 
+
 def test_token_round_trip_and_type_check() -> None:
     token = create_token(subject="user-123", token_type="access", lifetime=timedelta(minutes=5))
     assert decode_token(token, "access") == "user-123"
     assert decode_token(token, "refresh") is None
+
+
+def test_refresh_tokens_require_jti() -> None:
+    token = create_token(
+        subject="user-123",
+        token_type="refresh",
+        lifetime=timedelta(minutes=5),
+        jti="session-123",
+    )
+    claims = decode_token_claims(token, "refresh")
+    assert claims is not None
+    assert claims["jti"] == "session-123"

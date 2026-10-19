@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import ADMIN_ROLES, ensure_role, get_current_user, get_membership, require_org_membership
+from app.api.deps import ADMIN_ROLES, OWNER_ROLE, ensure_role, get_current_user, get_membership, require_org_membership
 from app.db import get_db_session
 from app.models.identity import User
 from app.models.organization import Membership, MembershipRole, Organization
@@ -66,6 +66,8 @@ async def update_member_role(organization_id: UUID, user_id: UUID, payload: Memb
     ensure_role(actor, ADMIN_ROLES)
     target = await db.scalar(select(Membership).where(Membership.organization_id == organization_id, Membership.user_id == user_id))
     if not target: raise HTTPException(status_code=404, detail="Member not found")
+    if target.role == MembershipRole.OWNER or payload.role == MembershipRole.OWNER:
+        ensure_role(actor, OWNER_ROLE)
     if target.role == MembershipRole.OWNER and payload.role != MembershipRole.OWNER:
         owner_count = await db.scalar(select(func.count()).select_from(Membership).where(Membership.organization_id == organization_id, Membership.role == MembershipRole.OWNER))
         if owner_count == 1: raise HTTPException(status_code=409, detail="Organization must retain an owner")

@@ -10,6 +10,7 @@ from app.models.feature_flags import (
 from app.models.identity import User
 from app.models.organization import Membership, MembershipRole, Organization
 from app.models.project import Environment, Project
+from app.models.refresh_session import RefreshSession
 
 __all__ = [
     "AuditLog",
@@ -22,6 +23,7 @@ __all__ = [
     "MembershipRole",
     "Organization",
     "Project",
+    "RefreshSession",
     "Segment",
     "TargetingRule",
     "User",
