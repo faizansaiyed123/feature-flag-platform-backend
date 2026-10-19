@@ -27,14 +27,12 @@ dev = [
 
 [tool.ruff]
 line-length = 100
+target-version = "py313"
 exclude = ["build"]
 
 [tool.ruff.lint]
-ignore = ["B008"]
-target-version = "py313"
-
-[tool.ruff.lint]
 select = ["E4", "E9", "F", "B", "ASYNC"]
+ignore = ["B008"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
