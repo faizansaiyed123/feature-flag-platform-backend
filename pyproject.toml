@@ -27,6 +27,10 @@ dev = [
 
 [tool.ruff]
 line-length = 100
+exclude = ["build"]
+
+[tool.ruff.lint]
+ignore = ["B008"]
 target-version = "py313"
 
 [tool.ruff.lint]

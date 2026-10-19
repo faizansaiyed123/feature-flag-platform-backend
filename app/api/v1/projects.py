@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import ADMIN_ROLES, WRITE_ROLES, ensure_environment_write_access, ensure_role, get_current_user, get_membership, require_project_access
+from app.api.deps import ADMIN_ROLES, WRITE_ROLES, ensure_role, get_current_user, get_membership, require_project_access
 from app.db import get_db_session
 from app.models.feature_flags import EnvironmentKey
 from app.models.identity import User
