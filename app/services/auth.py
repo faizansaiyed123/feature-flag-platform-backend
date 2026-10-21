@@ -109,8 +109,6 @@ async def signup(*, db: AsyncSession, email: str, password: str, display_name: s
             "Account could not be created because the submitted data conflicts with an existing account or workspace"
         ) from exc
 
-    # The caller owns the transaction so account, organization, membership, and
-    # authentication session are committed or rolled back together.
     return user
 
 async def login(*, db: AsyncSession, email: str, password: str) -> User | None:

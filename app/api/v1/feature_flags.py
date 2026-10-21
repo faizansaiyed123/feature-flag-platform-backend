@@ -98,7 +98,6 @@ async def update_flag(flag_id: UUID, payload: FeatureFlagUpdate, user: User = De
     flag, project, membership = await _flag_access(flag_id, user, db)
     ensure_role(membership, WRITE_ROLES)
     changes = payload.model_dump(exclude_unset=True)
-    # Archiving affects runtime availability, so restrict it to admins.
     if "is_archived" in changes:
         ensure_role(membership, ADMIN_ROLES)
     for field, value in changes.items():
