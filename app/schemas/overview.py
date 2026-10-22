@@ -3,7 +3,9 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-class AuditLogResponse(BaseModel):
+from app.schemas.common import ORMModel
+
+class AuditLogResponse(ORMModel):
     id: UUID
     action: str
     entity_type: str
