@@ -34,3 +34,8 @@ async def test_signup_does_not_commit_its_own_transaction() -> None:
     assert any(isinstance(item, User) for item in staged)
     assert any(isinstance(item, Organization) for item in staged)
     assert any(isinstance(item, Membership) for item in staged)
+
+def test_membership_role_database_values_match_migration() -> None:
+    role_type = Membership.__table__.c.role.type
+    assert list(role_type.enums) == ["owner", "admin", "member", "viewer"]
+
