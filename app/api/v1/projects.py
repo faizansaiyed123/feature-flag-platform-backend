@@ -89,7 +89,7 @@ async def create_environment(payload: EnvironmentCreate, access: tuple[Project, 
         await db.rollback()
         raise HTTPException(status_code=409, detail="Environment key already exists") from exc
     await db.refresh(environment)
-    return EnvironmentCreatedResponse.model_validate(environment).model_copy(update={"sdk_key": raw_key})
+    return EnvironmentCreatedResponse.model_validate({**environment.__dict__, "sdk_key": raw_key})
 
 @router.get("/environments/{environment_id}", response_model=EnvironmentResponse)
 async def get_environment(environment_id: UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db_session)) -> Environment:
