@@ -165,4 +165,4 @@ async def rotate_environment_key(environment_id: UUID, user: User = Depends(get_
     await db.commit()
     created = await db.scalar(select(EnvironmentKey).where(EnvironmentKey.key_hash == hash_sdk_key(raw_key)))
     assert created is not None
-    return EnvironmentKeyCreatedResponse.model_validate(created).model_copy(update={"sdk_key": raw_key})
+    return EnvironmentKeyCreatedResponse.model_validate({**created.__dict__, "sdk_key": raw_key})
