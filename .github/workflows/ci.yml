@@ -21,6 +21,9 @@ jobs:
       - name: Lint
         run: ruff check app migrations tests
       - name: Test
+        env:
+          AUTH_SECRET_KEY: ci-only-feature-flag-platform-secret-32-chars
+          CORS_ORIGINS: http://localhost:3000
         run: pytest -q
       - name: Compile
         run: python -m compileall app tests
