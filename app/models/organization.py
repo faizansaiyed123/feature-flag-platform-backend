@@ -45,7 +45,12 @@ class Membership(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     role: Mapped[MembershipRole] = mapped_column(
-        SAEnum(MembershipRole, name="membership_role", native_enum=True),
+        SAEnum(
+            MembershipRole,
+            name="membership_role",
+            native_enum=True,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
         nullable=False,
         default=MembershipRole.MEMBER,
         server_default=MembershipRole.MEMBER.value,
