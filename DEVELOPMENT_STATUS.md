@@ -35,12 +35,6 @@ Runtime evaluation is intentionally environment-key based and expects the SDK cr
 
 ## Verification
 
-Run:
+The backend has passed the full CI quality gate against PostgreSQL, including linting, tests, Python compilation, and Alembic migration-head validation. The full-stack browser workflow also starts this backend, applies migrations, and exercises the real UI-to-API-to-database flows.
 
-```bash
-pytest
-python -m compileall app tests
-alembic heads
-```
-
-A PostgreSQL instance is required for database-backed integration tests and migrations.
+A staging deployment still needs environment-specific smoke testing because production infrastructure, domains, cookies, and browser policy can differ from CI.
