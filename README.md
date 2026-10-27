@@ -191,7 +191,6 @@ run.py                 # Local Docker Compose launcher
 
 ## Documentation
 
-- [Development status](DEVELOPMENT_STATUS.md)
 - [Backend CI workflow](.github/workflows/ci.yml)
 - [Feature Flag Platform frontend](https://github.com/faizansaiyed123/feature-flag-platform-frontend)
 - [Product walkthrough and screenshots](https://github.com/faizansaiyed123/feature-flag-platform-frontend/blob/main/docs/testing/VISUAL-TEST-WALKTHROUGH.md)
