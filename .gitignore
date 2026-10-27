@@ -10,3 +10,19 @@ htmlcov/
 .env.*
 !.env.example
 alembic.ini.local
+
+# Generated build and dependency output
+node_modules/
+build/
+dist/
+coverage/
+
+# Browser test output
+playwright-report/
+test-results/
+
+# Local runtime data and logs
+*.log
+logs/
+storage/
+uploads/
